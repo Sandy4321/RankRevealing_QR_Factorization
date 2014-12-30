@@ -1,15 +1,18 @@
 #/bin/python
 import os;
 import sys;
-golub_dir = os.path.split(os.path.realpath(__file__))[0]+"/../Golub_RRQR";
+golub_dir  = os.path.split(os.path.realpath(__file__))[0]+"/../Golub_RRQR";
 sys.path.append(golub_dir);
-util_dir  = os.path.split(os.path.realpath(__file__))[0]+"/../Python_Utils";
-sys.path.append(util_dir);
+#When as standalone program 
+util_dir1  = os.path.split(os.path.realpath(__file__))[0]+"/../utils/Python_Utils";
+sys.path.append(util_dir1);
+#When as external module
+util_dir2  = os.path.split(os.path.realpath(__file__))[0]+"/../../Python_Utils";
+sys.path.append(util_dir1);
 from numpy import *;
 from math  import *;
 from Matrix_Utils import *;
 from Float_Utils import *;
-import Golub_RRQR
 import HouseHolder
 import numpy as np;
 
@@ -118,9 +121,13 @@ def show_step(R, invA_B, omega, gamma, k):
 
 
 
-def rrqr(M, k, f=1.414):
-    R,PI = Golub_RRQR.rrqr(M,0.0001);
-    m,n  = R.shape;
+def rrqr(R, k, f=1.414):
+    m,n = R.shape;
+
+    for i in xrange(k+1):
+        R = HouseHolder.HouseHolder_step(R, i)     
+    PI   = array(range(n));
+
     Ak   = R[0:k,  0:k];
     Bk   = R[0:k,  k:n]; 
     invA = linalg.inv(Ak);
@@ -145,8 +152,8 @@ def rrqr(M, k, f=1.414):
 
     flag,i,j = is_rho_less_f(invA_B, omega, gamma, k, f);
     while not flag:
-        R, invA_B, omega, gamma =  \
-        update_swap_k_kplusj(R, invA_B, omega, gamma, k, j);
+        R, PI, invA_B, omega, gamma =  \
+        update_swap_k_kplusj(R, PI, invA_B, omega, gamma, k, j);
         if True == Debug:
             print "swap_k_kplusj: j = ",j,"  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>";
             show_step(R, invA_B, omega, gamma, k);
@@ -155,9 +162,8 @@ def rrqr(M, k, f=1.414):
                 matrix_show(M);
                 exit(0);
 
-        R, invA_B, omega, gamma =  \
-        update_shift(R, invA_B, omega, gamma, i, k);
- 
+        R, PI, invA_B, omega, gamma =  \
+        update_shift(R, PI, invA_B, omega, gamma, i, k);
         if True == Debug:
             print "shift:i = ",i, "   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
             show_step(R, invA_B, omega, gamma,k);
@@ -166,8 +172,8 @@ def rrqr(M, k, f=1.414):
                 matrix_show(M);
                 exit(0);                
 
-        R, invA_B, omega, gamma =  \
-        update_swap_kminus1_k(R, invA_B, omega, gamma,k);           
+        R, PI, invA_B, omega, gamma =  \
+        update_swap_kminus1_k(R, PI, invA_B, omega, gamma,k);           
         if True == Debug:
             print "swap_kminus1_k  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
             show_step(R, invA_B, omega, gamma, k);
@@ -183,7 +189,7 @@ def rrqr(M, k, f=1.414):
             print "Test fails. Please debug this matrix:";
             matrix_show(M);
             exit(0);
-    return R;
+    return R, PI;
 
 
 def is_rho_less_f(invA_B, omega, gamma, k, f=1.414):    
@@ -199,11 +205,16 @@ def is_rho_less_f(invA_B, omega, gamma, k, f=1.414):
         
 
 
-def update_swap_k_kplusj(R, invA_B, omega, gamma, k, j): 
+def update_swap_k_kplusj(R, PI, invA_B, omega, gamma, k, j): 
+
     #swap column k and column k + j;  
     row,col = R.shape; 
     if j == 0 or k+j >= col:
-        return R, invA_B, omega, gamma,;
+        return R, PI, invA_B, omega, gamma,;
+
+    tmp     = copy(PI[k]);
+    PI[k]   = PI[k+j];
+    PI[k+j] = tmp;
 
     tmp             = copy(R[:,k:k+1]);
     R[:,k:k+1]      = R[:,k+j:k+j+1];
@@ -230,12 +241,18 @@ def update_swap_k_kplusj(R, invA_B, omega, gamma, k, j):
     invA_B[:,j:j+1] =  invA_B[:,0:1];
     invA_B[:,0:1]   =  tmp;
     
-    return R, invA_B , omega, gamma;
+    return R, PI, invA_B , omega, gamma;
 
-def update_shift(R, invA_B, omega, gamma, i, k):
+def update_shift(R, PI, invA_B, omega, gamma, i, k):
     #4.2
     m,n = R.shape;
-    if i >= k:   return R, invA_B, omega, gamma
+    if i >= k:   return R, PI, invA_B, omega, gamma
+
+    tmp = copy(PI[i]);
+    for idx in xrange(i,k-1):
+        PI[idx] = PI[idx+1];
+    PI[k-1] = tmp;
+    
     tmp = copy(R[0:k,i:i+1]);
     for idx in xrange(i,k-1):
         R[0:k, idx:idx+1] = R[0:k, idx+1:idx+2];
@@ -263,10 +280,14 @@ def update_shift(R, invA_B, omega, gamma, i, k):
         invA_B[idx:idx+1,:] = invA_B[idx+1:idx+2,:];
     invA_B[k-1:k,:] = tmp;
     
-    return R, invA_B, omega, gamma;
+    return R, PI, invA_B, omega, gamma;
 
  
-def update_swap_kminus1_k(R,invA_B, omega,gamma,k):
+def update_swap_kminus1_k(R,PI,invA_B, omega,gamma,k):
+    tmp     = copy(PI[k-1]);
+    PI[k-1] = PI[k];
+    PI[k]   = tmp;
+
     row,col = R.shape;
     r  = R[k-1][k-1];
     print r;
@@ -342,7 +363,7 @@ def update_swap_kminus1_k(R,invA_B, omega,gamma,k):
     new_invA_B[k-1:k, 1:invA_B_col]  = copy(R[k-1:k, k+1:col])/hatr;
     new_invA_B[0:k-1, 0:1         ]  = (nu*nu*u - mu*u1)/lou/lou;
     new_invA_B[0:k-1, 1:invA_B_col]  = U + (nu*dot(u,c2) - dot(u1,c1)) / hatr; 
-    return R, new_invA_B, omega, gamma;    
+    return R, PI, new_invA_B, omega, gamma;    
 
 if __name__ == "__main__":
     Debug = True;
