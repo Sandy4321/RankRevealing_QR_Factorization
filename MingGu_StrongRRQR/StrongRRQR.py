@@ -1,9 +1,11 @@
 #/bin/python
+import os;
 import sys;
+golub_dir = os.path.split(os.path.realpath(__file__))[0]+"/../Golub_RRQR";
+sys.path.append(golub_dir);
 from numpy import *;
 import numpy as np;
 from math  import *;
-sys.path.append("../Golub_RRQR");
 import Golub_RRQR
 import HouseHolder
 
