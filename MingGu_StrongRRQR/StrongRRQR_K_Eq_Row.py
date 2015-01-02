@@ -1,4 +1,6 @@
 #/bin/python
+#This code is for the special case, where k == row < col:
+
 import os;
 import sys;
 golub_dir  = os.path.split(os.path.realpath(__file__))[0]+"/../Golub_RRQR";
@@ -9,6 +11,7 @@ sys.path.append(util_dir1);
 #When as external module
 util_dir2  = os.path.split(os.path.realpath(__file__))[0]+"/../../Python_Utils";
 sys.path.append(util_dir1);
+
 from numpy import *;
 from math  import *;
 from Matrix_Utils import *;
@@ -18,7 +21,7 @@ import numpy as np;
 
 np.random.seed(0);
 
-Debug=False;
+Debug = False;
 
 
 def check_final(R,k,f=1.414):
