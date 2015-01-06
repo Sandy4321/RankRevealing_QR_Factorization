@@ -28,7 +28,7 @@ def HouseHolder_step(M,k):
 
     uut = dot(u, transpose(u));
     M = M - betak * dot(uut,M);
-    
+   
     return M;
 
         

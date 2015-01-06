@@ -13,12 +13,14 @@ from numpy import *;
 from math  import *;
 from Matrix_Utils import *;
 from Float_Utils import *;
-import HouseHolder
+from Test_Utils import *;
+import HouseHolder;
+import Golub_RRQR;
 import numpy as np;
 
 np.random.seed(0);
 
-Debug=False;
+is_debug=False;
 
 
 def check_final(R,k,f=1.414):
@@ -32,7 +34,11 @@ def check_final(R,k,f=1.414):
     print "final check starts";
     u,sigma_R,v  = linalg.svd(R);
     u,sigma_Ak,v = linalg.svd(Ak);
-    u,sigma_Ck,v = linalg.svd(Ck);
+    if k != c:
+        u,sigma_Ck,v = linalg.svd(Ck);
+    else:
+        sigma_Ck = array([]);
+
     for i in xrange(k):
         if gt(sigma_Ak[i], sigma_R[i]):
             print "sigma_Ak[%d] > sigma_R[%d]"%(i,i);
@@ -122,15 +128,23 @@ def show_step(R, invA_B, omega, gamma, k):
 
 
 def rrqr(R, k, f=1.414):
-    M = 0;
-    if True == Debug:
-        M  = copy(R);    
-
     m,n = R.shape;
+    if m < n:
+        raise Exception("Strong Rank Revealing QR Factorization requires m >= n, but m=%d, n=%d"%(m,n));
+    if k > n or k <= 0:
+        raise Exception("Strong Rank Revealing QR Factorization requires 1<= k <= n, but n=%d, k=%d"%(n,k));
 
-    for i in xrange(k+1):
-        R = HouseHolder.HouseHolder_step(R, i)     
-    PI   = array(range(n));
+    
+    PI = array([]);
+    if True == is_debug:
+        M  = copy(R);
+        PI = array(range(n));
+        for i in xrange(k+1):
+            R = HouseHolder.HouseHolder_step(R,i);
+    else:     
+        R,PI,k1 = Golub_RRQR.rrqr(R, k);
+        k = k1;
+    
 
     Ak   = R[0:k,  0:k];
     Bk   = R[0:k,  k:n]; 
@@ -149,7 +163,7 @@ def rrqr(R, k, f=1.414):
 
     invA_B = dot(invA, Bk);
 
-    if True == Debug:
+    if True == is_debug:
         print "start:>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>";
         show_step(R, invA_B, omega, gamma, k);    
         check_step(R, invA_B, omega, gamma, k);
@@ -158,7 +172,7 @@ def rrqr(R, k, f=1.414):
     while not flag:
         R, PI, invA_B, omega, gamma =  \
         update_swap_k_kplusj(R, PI, invA_B, omega, gamma, k, j);
-        if True == Debug:
+        if True == is_debug:
             print "swap_k_kplusj: j = ",j,"  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>";
             show_step(R, invA_B, omega, gamma, k);
             if not check_step(R, invA_B, omega, gamma, k):
@@ -168,7 +182,7 @@ def rrqr(R, k, f=1.414):
 
         R, PI, invA_B, omega, gamma =  \
         update_shift(R, PI, invA_B, omega, gamma, i, k);
-        if True == Debug:
+        if True == is_debug:
             print "shift:i = ",i, "   >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
             show_step(R, invA_B, omega, gamma,k);
             if not check_step(R, invA_B, omega, gamma, k):
@@ -178,7 +192,7 @@ def rrqr(R, k, f=1.414):
 
         R, PI, invA_B, omega, gamma =  \
         update_swap_kminus1_k(R, PI, invA_B, omega, gamma,k);           
-        if True == Debug:
+        if True == is_debug:
             print "swap_kminus1_k  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
             show_step(R, invA_B, omega, gamma, k);
             if not check_step(R, invA_B, omega, gamma, k):
@@ -188,12 +202,12 @@ def rrqr(R, k, f=1.414):
 
         flag, i, j = is_rho_less_f(invA_B, omega, gamma, k ,f); 
     
-    if True == Debug:
+    if True == is_debug:
         if not check_final(R, k, f):
             print "Test fails. Please debug this matrix:";
             matrix_show(M);
             exit(0);
-    return R, PI;
+    return R, PI, k;
 
 
 def is_rho_less_f(invA_B, omega, gamma, k, f=1.414):    
@@ -215,7 +229,8 @@ def update_swap_k_kplusj(R, PI, invA_B, omega, gamma, k, j):
     row,col = R.shape; 
     if j == 0 or k+j >= col:
         return R, PI, invA_B, omega, gamma,;
-
+    print PI.shape;
+    print k;
     tmp     = copy(PI[k]);
     PI[k]   = PI[k+j];
     PI[k+j] = tmp;
@@ -275,7 +290,7 @@ def update_shift(R, PI, invA_B, omega, gamma, i, k):
             R[idx+1, j] = down;      
 
     tmp = omega[i];
-    for idx in xrange(i,k):
+    for idx in xrange(i,k-1):
         omega[idx] = omega[idx+1];
     omega[k-1] = tmp;
 
@@ -319,12 +334,13 @@ def update_swap_kminus1_k(R,PI,invA_B, omega,gamma,k):
         return R, PI, invA_B, omega, gamma; 
         
 
+
     r  = R[k-1][k-1];
     mu = R[k-1][k] / r;
     nu = R[k][k]   / r;
     lou = math.sqrt(mu * mu + nu * nu);
 
-    test_code=''''''
+    test_code=''''
     print "before update_swap_kminus1_k";
     print "R:";
     matrix_show(R);
@@ -395,51 +411,62 @@ def update_swap_kminus1_k(R,PI,invA_B, omega,gamma,k):
     return R, PI, new_invA_B, omega, gamma;    
 
 if __name__ == "__main__":
-    Debug = True;
-    print "case:***************************************************************************************************************************************************"
+ 
+
+    is_debug = True;
+    test_start_show();
+    testM = array([[1,2,3,4],[1,2,3,4],[1,2,3,4],[0,2,3,4],[0,0,3,4],[0,0,0,4]]);
+    R     = rrqr(testM, 4);
+    test_end_show();
+
+    #test_start_show();
+    #m = matrix_read("./testdata");
+    #print m.shape;
+    #R,PI = rrqr(m,2);
+    #test_end_show();
+
+    test_start_show();
     testM = array([[1,0,1,1],[0,1,1,1],[1,1,1,0],[1,0,1,0]]);
     R = rrqr(testM,3);
+    test_end_show();
 
 
-    print "case:***************************************************************************************************************************************************"
+    test_start_show();
     testM[3,3] = 10;
     R = rrqr(testM,2);
+    test_end_show();
 
 
-    print "case: **************************************************************************************************************************************************"
+    test_start_show();
     testM = array([[1,0,1,1,1],[0,1,1,1,1],[1,1,1,0,1],[1,0,1,0,1],[10,10,10,10,10]]);
     R = rrqr(testM,3);
+    test_end_show();
 
-    print "case: ***************************************************************************************************************************************************"
+    test_start_show();
     R = rrqr(testM,1);
+    test_end_show();
 
     for i in xrange(100):
         for k in xrange(1,6): 
-            print "case:****************************************\
-                        ****************************************\
-                        ****************************************\
-                        ****************************************";
+            test_start_show();
             del testM;
             testM = np.random.rand(6,6);
             R = rrqr(testM,k);
+            test_end_show();
 
     
     for i in xrange(100):
         for k in xrange(1,7):
-            print "case:****************************************\
-                        ****************************************\
-                        ****************************************\
-                        ****************************************";
+            test_start_show();
             del testM;
             testM = np.random.rand(7,7);
-            R = rrqr(testM,k);   
+            R = rrqr(testM,k);
+            test_end_show();   
     
     for i in xrange(100):
         for k in xrange(1,8):
-            print "case:****************************************\
-                        ****************************************\
-                        ****************************************\
-                        ***************************************";
+            test_start_show();
             del testM;
             testM = np.random.rand(8,8);
-            R = rrqr(testM,k); 
+            R = rrqr(testM,k);
+            test_end_show(); 
