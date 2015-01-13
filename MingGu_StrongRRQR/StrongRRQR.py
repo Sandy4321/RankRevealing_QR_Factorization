@@ -134,6 +134,13 @@ def rrqr(R, k, f=1.414):
     if k > n or k <= 0:
         raise Exception("Strong Rank Revealing QR Factorization requires 1<= k <= n, but n=%d, k=%d"%(n,k));
 
+    if True == is_debug:
+        print "start:>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>";
+        print "R:";
+        matrix_show(R);
+        print "k:",k;
+        print "";
+        #check_final(R, k, f);
     
     PI = array([]);
     if True == is_debug:
@@ -164,7 +171,7 @@ def rrqr(R, k, f=1.414):
     invA_B = dot(invA, Bk);
 
     if True == is_debug:
-        print "start:>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>";
+        print "After HouseHolder";
         show_step(R, invA_B, omega, gamma, k);    
         check_step(R, invA_B, omega, gamma, k);
 
@@ -340,17 +347,6 @@ def update_swap_kminus1_k(R,PI,invA_B, omega,gamma,k):
     nu = R[k][k]   / r;
     lou = math.sqrt(mu * mu + nu * nu);
 
-    test_code=''''
-    print "before update_swap_kminus1_k";
-    print "R:";
-    matrix_show(R);
-    print "invA_B";
-    matrix_show(invA_B);
-    print "omega:";
-    matrix_show(omega);
-    print "gamma:";
-    matrix_show(gamma);#'''    
-
 
     invA_B_r,invA_B_c = invA_B.shape;
     Akminus1 = copy(R[0:k-1, 0:k-1]);
@@ -359,20 +355,6 @@ def update_swap_kminus1_k(R,PI,invA_B, omega,gamma,k):
     u1       = invA_B[0:k-1,0:1];
     u2       = transpose(invA_B[k-1:k, 1:invA_B_c]);
     U        = invA_B[0:k-1, 1:invA_B_c];
-
-    test_code='''
-    print "Akminus1:";
-    matrix_show(Akminus1);
-    print "b1";
-    matrix_show(b1);
-    print "u:";
-    matrix_show(u);
-    print "u1:";
-    matrix_show(u1);
-    print "u2:";
-    matrix_show(u2);
-    print "U:";
-    matrix_show(U);'''
 
     #R and gamma
     tmp             = copy(R[0:k-1, k-1:k])
@@ -412,8 +394,25 @@ def update_swap_kminus1_k(R,PI,invA_B, omega,gamma,k):
 
 if __name__ == "__main__":
  
-
     is_debug = True;
+
+    test_start_show();
+    print "Kahan example1, n = 10, k = 9, psi = 0,8, ksi=0.6. I check kahan example1 with these settings doesn't satisfy the conditions of RRQR  ";
+    sn = zeros([10,10]);
+    sn[0,0] = 1;
+    for i in xrange(1,10):
+        sn[i,i] = 0.6 * sn[i-1,i-1];
+    kn = zeros([10,10]);
+    for i in xrange(10):
+        for j in xrange(10):
+            if i == j:  kn[i,j] = 1;
+            if i < j :  kn[i,j] = -0.8;
+    testM = dot(sn,kn);
+    R     = rrqr(testM, 9);
+    test_end_show();
+    0/0
+
+
     test_start_show();
     testM = array([[1,2,3,4],[1,2,3,4],[1,2,3,4],[0,2,3,4],[0,0,3,4],[0,0,0,4]]);
     R     = rrqr(testM, 4);
@@ -449,7 +448,6 @@ if __name__ == "__main__":
     for i in xrange(100):
         for k in xrange(1,6): 
             test_start_show();
-            del testM;
             testM = np.random.rand(6,6);
             R = rrqr(testM,k);
             test_end_show();
@@ -458,7 +456,6 @@ if __name__ == "__main__":
     for i in xrange(100):
         for k in xrange(1,7):
             test_start_show();
-            del testM;
             testM = np.random.rand(7,7);
             R = rrqr(testM,k);
             test_end_show();   
@@ -466,7 +463,6 @@ if __name__ == "__main__":
     for i in xrange(100):
         for k in xrange(1,8):
             test_start_show();
-            del testM;
-            testM = np.random.rand(8,8);
-            R = rrqr(testM,k);
+            testM = np.random.rand(1000,100);
+            R = rrqr(testM,k+20);
             test_end_show(); 
