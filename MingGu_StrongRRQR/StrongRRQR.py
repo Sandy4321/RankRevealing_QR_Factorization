@@ -410,7 +410,6 @@ if __name__ == "__main__":
     testM = dot(sn,kn);
     R     = rrqr(testM, 9);
     test_end_show();
-    0/0
 
 
     test_start_show();
